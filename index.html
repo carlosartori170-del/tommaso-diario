@@ -91,6 +91,10 @@ function total(rec){ return (rec && rec.entries ? rec.entries : []).reduce((s,e)
 
 function ensureDay(key){
   let rec = loadDayRaw(key);
+  // scarta record salvati con un formato incompatibile (es. versione precedente dell'app)
+  if(rec && (!Array.isArray(rec.entries) || typeof rec.goal !== "number")){
+    rec = null;
+  }
   if(!rec){
     const prevKey = shiftDay(key, -1);
     const prevRec = loadDayRaw(prevKey);
@@ -289,7 +293,15 @@ function render(){
   document.getElementById("tabCrescita").className = "tab sans" + (tab==="crescita" ? " active" : "");
   document.getElementById("viewPasti").style.display = tab==="pasti" ? "block" : "none";
   document.getElementById("viewCrescita").style.display = tab==="crescita" ? "block" : "none";
-  if(tab==="pasti") renderPasti(); else renderCrescita();
+  try{
+    if(tab==="pasti") renderPasti(); else renderCrescita();
+  }catch(err){
+    const target = document.getElementById(tab==="pasti" ? "viewPasti" : "viewCrescita");
+    target.innerHTML = `<div class="empty sans" style="text-align:center; padding:30px 10px;">
+      Qualcosa non ha funzionato nel caricare i dati salvati su questo dispositivo.<br/><br/>
+      <button class="btn-add sans" onclick="localStorage.clear(); location.reload();">Ripristina l'app su questo telefono</button>
+    </div>`;
+  }
 }
 
 render();
