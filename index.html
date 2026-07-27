@@ -10,12 +10,11 @@
     --gold:#B08A5A; --amber:#D9A441; --clay:#C1694F; --sage:#6E8B74;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:var(--paper); color:var(--ink);
-    font-family:Georgia,'Iowan Old Style',serif;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:Georgia,'Iowan Old Style',serif;}
   .sans{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
   button{cursor:pointer; font-family:inherit;}
   header{padding:28px 20px 18px; border-bottom:1px solid var(--line2);}
-  .headrow{display:flex; align-items:baseline; justify-content:space-between; max-width:640px; margin:0 auto;}
+  .headwrap{max-width:640px; margin:0 auto;}
   .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold);}
   h1{margin:2px 0 0; font-size:30px; font-weight:600;}
   .tabs{display:flex; justify-content:center; gap:6px; padding:16px 20px 0;}
@@ -28,46 +27,36 @@
   .navbtn:disabled{color:var(--line2);}
   .daylabel{font-size:17px; font-weight:600; text-transform:capitalize; text-align:center;}
   .daysub{font-size:12px; color:#8A7A61; text-align:center;}
-  .toast{background:#EFE4CC; border:1px solid var(--amber); color:#6B5320; padding:10px 14px;
-    border-radius:10px; font-size:13.5px; margin-bottom:16px;}
-  .meal{background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px;
-    display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;}
-  .mealno{font-size:12px; color:var(--gold); font-weight:700;}
-  .mealtarget{font-size:20px; font-weight:600;}
-  .carried{font-size:12px; color:var(--clay);}
-  .status{font-size:12.5px; margin-top:2px;}
-  .status.ok{color:var(--sage);} .status.no{color:var(--clay);}
-  .actions{display:flex; gap:6px;}
-  .btn-fin{background:var(--sage); color:#fff; border:none; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600;}
-  .leftover-input{width:62px; border:1px solid var(--line2); border-radius:10px; padding:8px; font-size:13px;}
-  .btn-mark{background:var(--clay); color:#fff; border:none; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600;}
-  .btn-edit{background:none; border:1px solid var(--line2); border-radius:10px; padding:7px 10px; font-size:12px; color:#8A7A61;}
-  .summary{margin-top:18px; text-align:center; font-size:13.5px;}
+  .toast{background:#EFE4CC; border:1px solid var(--amber); color:#6B5320; padding:10px 14px; border-radius:10px; font-size:13.5px; margin-bottom:16px;}
+  .ringwrap{display:flex; justify-content:center;}
+  .remaining{text-align:center; margin:14px 0 22px; font-size:14px;}
   .card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:20px;}
   .cardtitle{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:10px;}
   .formrow{display:flex; gap:8px; flex-wrap:wrap;}
   .formrow input{border:1px solid var(--line2); border-radius:10px; padding:9px 10px; font-size:13px; flex:1 1 140px;}
   .btn-add{background:var(--ink); color:#fff; border:none; border-radius:10px; padding:9px 16px; font-size:13px; font-weight:600;}
-  .histitem{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+  .entry, .histitem{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px;
     display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
-  .histdate{font-size:13.5px; color:#8A7A61; text-transform:capitalize;}
+  .entrytime, .histdate{font-size:13px; color:#8A7A61;}
+  .histdate{text-transform:capitalize;}
   .btn-rm{background:none; border:none; color:var(--clay); font-size:16px;}
   .empty{color:#8A7A61; font-size:13px;}
+  .goalinputs{display:flex; gap:10px; flex-wrap:wrap;}
+  .goalinputs label{font-size:12.5px; color:#8A7A61;}
+  .goalinputs input{display:block; margin-top:4px; border:1px solid var(--line2); border-radius:10px; padding:8px 10px; font-size:13px; width:100px;}
+  .goalnote{font-size:12px; color:#8A7A61; margin-top:8px;}
 </style>
 </head>
 <body>
 <header>
-  <div class="headrow">
-    <div>
-      <div class="eyebrow sans">Diario di crescita</div>
-      <h1>Tommaso</h1>
-    </div>
-    <svg id="ring" width="56" height="56"></svg>
+  <div class="headwrap">
+    <div class="eyebrow sans">Diario di crescita</div>
+    <h1>Tommaso</h1>
   </div>
 </header>
 
 <div class="tabs sans">
-  <button class="tab active" id="tabPasti" onclick="setTab('pasti')">🍼 Pasti</button>
+  <button class="tab active" id="tabPasti" onclick="setTab('pasti')">🍼 Poppate</button>
   <button class="tab" id="tabCrescita" onclick="setTab('crescita')">⚖️ Crescita</button>
 </div>
 
@@ -83,56 +72,70 @@ const LS = {
   set(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){} }
 };
 
-const DEFAULT_SETTINGS = { baseAmount: 90, unit: "ml", step: 10 };
+const DEFAULT_SETTINGS = { goal: 630, step: 70, unit: "ml" };
 let settings = LS.get("settings", DEFAULT_SETTINGS);
+let dayIndex = LS.get("dayIndex", []);
 let weights = LS.get("weights", []);
 let dayKey = todayKey();
-let leftoverDraft = {};
 let toastMsg = "";
 let tab = "pasti";
 
 function todayKey(d){ d = d || new Date(); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
-function prettyDate(key){ const d = new Date(key+"T00:00:00"); return d.toLocaleDateString("it-IT",{weekday:"long", day:"numeric", month:"long"}); }
+function prettyDate(key){ return new Date(key+"T00:00:00").toLocaleDateString("it-IT",{weekday:"long", day:"numeric", month:"long"}); }
+function shortDate(key){ return new Date(key+"T00:00:00").toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit"}); }
 function shiftDay(key, delta){ const d = new Date(key+"T00:00:00"); d.setDate(d.getDate()+delta); return todayKey(d); }
-function loadDay(key){ return LS.get(`day:${key}`, { date:key, baseAmount: settings.baseAmount, meals: Array.from({length:7}, ()=>({leftover:null})) }); }
+function nowTime(){ return new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}); }
+function loadDayRaw(key){ return LS.get(`day:${key}`, null); }
 function saveDay(rec){ LS.set(`day:${rec.date}`, rec); }
+function total(rec){ return (rec && rec.entries ? rec.entries : []).reduce((s,e)=>s+e.amount,0); }
 
-let dayRecord = loadDay(dayKey);
-
-function computeTargets(rec){
-  const t = []; let carry = 0;
-  for(let i=0;i<7;i++){ t.push(rec.baseAmount + carry); carry = rec.meals[i]?.leftover ?? 0; }
-  return t;
+function ensureDay(key){
+  let rec = loadDayRaw(key);
+  if(!rec){
+    const prevKey = shiftDay(key, -1);
+    const prevRec = loadDayRaw(prevKey);
+    if(prevRec){
+      const prevTotal = total(prevRec);
+      if(prevTotal >= prevRec.goal){
+        settings = { ...settings, goal: settings.goal + settings.step };
+        LS.set("settings", settings);
+        toastMsg = `Obiettivo di ieri raggiunto (${prevTotal} ${settings.unit})! Da oggi l'obiettivo sale a ${settings.goal} ${settings.unit}.`;
+      }
+    }
+    rec = { date: key, goal: settings.goal, entries: [] };
+    saveDay(rec);
+  }
+  if(!dayIndex.includes(key)){ dayIndex = [...dayIndex, key].sort(); LS.set("dayIndex", dayIndex); }
+  return rec;
 }
 
-function commitMeal(index, leftoverValue){
-  dayRecord.meals[index] = { leftover: leftoverValue };
+let dayRecord = ensureDay(dayKey);
+
+function historyList(){
+  return dayIndex.filter(k => k !== dayKey)
+    .map(k => loadDayRaw(k)).filter(Boolean)
+    .map(r => ({ date: r.date, total: total(r), goal: r.goal }))
+    .sort((a,b)=> b.date.localeCompare(a.date));
+}
+
+function addEntry(){
+  const input = document.getElementById("amountInput");
+  const v = parseFloat((input.value||"").replace(",", "."));
+  if(isNaN(v) || v <= 0) return;
+  dayRecord.entries.push({ id: Date.now().toString(36), time: nowTime(), amount: Math.round(v) });
   saveDay(dayRecord);
-  const nowAllDone = dayRecord.meals.every(m => m.leftover !== null);
-  if(nowAllDone){
-    const allFinished = dayRecord.meals.every(m => m.leftover === 0);
-    if(allFinished){
-      settings = { ...settings, baseAmount: settings.baseAmount + settings.step };
-      LS.set("settings", settings);
-      toastMsg = `Giornata completata senza avanzi! Da domani si passa a ${settings.baseAmount} ${settings.unit} a pasto.`;
-    } else {
-      toastMsg = "Giornata registrata. Restiamo alla stessa quantità per domani.";
-    }
-    setTimeout(()=>{ toastMsg=""; render(); }, 3200);
-  }
+  input.value = "";
   render();
 }
+function removeEntry(id){ dayRecord.entries = dayRecord.entries.filter(e=>e.id!==id); saveDay(dayRecord); render(); }
+function goDay(delta){ dayKey = shiftDay(dayKey, delta); dayRecord = ensureDay(dayKey); render(); }
 
-function markFinished(i){ commitMeal(i, 0); }
-function markLeftover(i){
-  const raw = (leftoverDraft[i] ?? "").replace(",", ".");
-  const v = parseFloat(raw);
+function updateGoalSetting(field, value){
+  const v = parseInt(value, 10);
   if(isNaN(v) || v < 0) return;
-  commitMeal(i, v);
+  settings = { ...settings, [field]: v };
+  LS.set("settings", settings);
 }
-function resetMeal(i){ dayRecord.meals[i] = { leftover: null }; saveDay(dayRecord); render(); }
-function onLeftoverInput(i, val){ leftoverDraft[i] = val; }
-function goDay(delta){ dayKey = shiftDay(dayKey, delta); dayRecord = loadDay(dayKey); leftoverDraft = {}; render(); }
 
 function addWeight(){
   const dateEl = document.getElementById("wDate");
@@ -152,70 +155,82 @@ function removeWeight(date){ weights = weights.filter(w=>w.date!==date); LS.set(
 function setTab(t){ tab = t; render(); }
 
 // ---------- rendering ----------
-function renderRing(){
-  const svg = document.getElementById("ring");
-  const size=56, r=22, cx=28, cy=28;
-  let html = "";
-  for(let i=0;i<7;i++){
-    const angle = (Math.PI*2*i)/7 - Math.PI/2;
-    const x = cx + r*Math.cos(angle), y = cy + r*Math.sin(angle);
-    const m = dayRecord.meals[i];
-    const fill = !m || m.leftover===null ? "#EFE6D6" : m.leftover===0 ? "#6E8B74" : "#C1694F";
-    html += `<circle cx="${x}" cy="${y}" r="5.5" fill="${fill}"/>`;
-  }
-  html += `<circle cx="${cx}" cy="${cy}" r="3" fill="#B08A5A"/>`;
-  svg.innerHTML = html;
-}
-
 function renderPasti(){
-  const targets = computeTargets(dayRecord);
   const isToday = dayKey === todayKey();
-  const recordedCount = dayRecord.meals.filter(m=>m.leftover!==null).length;
-  const allDone = recordedCount === 7;
-  const dayFullyFinished = allDone && dayRecord.meals.every(m=>m.leftover===0);
+  const currentTotal = total(dayRecord);
+  const remaining = Math.max(dayRecord.goal - currentTotal, 0);
+  const reached = currentTotal >= dayRecord.goal;
+  const pct = Math.min(currentTotal / dayRecord.goal, 1);
+  const hist = historyList();
 
-  let html = `
+  const size=168, stroke=12, r=(size-stroke)/2, c=2*Math.PI*r, offset = c*(1-pct);
+  const ringSvg = `<svg width="${size}" height="${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="#EFE6D6" stroke-width="${stroke}" fill="none"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="${reached?'#6E8B74':'#D9A441'}" stroke-width="${stroke}" fill="none"
+      stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 ${size/2} ${size/2})"/>
+    <text x="50%" y="47%" text-anchor="middle" font-size="26" font-weight="600" fill="#2B3A42" font-family="Georgia, serif">${currentTotal}</text>
+    <text x="50%" y="63%" text-anchor="middle" font-size="12" fill="#8A7A61" font-family="-apple-system,sans-serif">di ${dayRecord.goal} ${settings.unit}</text>
+  </svg>`;
+
+  let entriesHtml = "";
+  [...dayRecord.entries].reverse().forEach(e=>{
+    entriesHtml += `<div class="entry">
+      <span class="entrytime sans">${e.time}</span>
+      <span style="font-weight:600">${e.amount} ${settings.unit}</span>
+      <button class="btn-rm sans" onclick="removeEntry('${e.id}')">✕</button>
+    </div>`;
+  });
+  if(dayRecord.entries.length===0) entriesHtml = `<div class="empty sans" style="text-align:center">Nessuna poppata registrata per questo giorno.</div>`;
+
+  let histHtml = "";
+  hist.forEach(h=>{
+    histHtml += `<div class="histitem">
+      <span class="histdate sans">${prettyDate(h.date)}</span>
+      <span style="font-weight:600">${h.total} ${settings.unit}</span>
+      ${h.total >= h.goal ? `<span style="color:#6E8B74">✓</span>` : `<span class="sans" style="font-size:11px;color:#C1694F">su ${h.goal}</span>`}
+    </div>`;
+  });
+  if(hist.length===0) histHtml = `<div class="empty sans">Nessun giorno precedente registrato.</div>`;
+
+  document.getElementById("viewPasti").innerHTML = `
     <div class="navrow">
       <button class="navbtn" onclick="goDay(-1)">‹</button>
       <div>
         <div class="daylabel">${prettyDate(dayKey)}</div>
-        <div class="daysub sans">${isToday ? "Oggi · " : ""}base ${dayRecord.baseAmount} ${settings.unit}</div>
+        <div class="daysub sans">${isToday ? "Oggi" : ""}</div>
       </div>
       <button class="navbtn" onclick="goDay(1)" ${isToday?"disabled":""}>›</button>
     </div>
     ${toastMsg ? `<div class="toast sans">${toastMsg}</div>` : ""}
+    <div class="ringwrap">${ringSvg}</div>
+    <div class="remaining sans" style="color:${reached?'#6E8B74':'#8A7A61'}">
+      ${reached ? "Obiettivo raggiunto per oggi 🎉" : `Mancano ${remaining} ${settings.unit} all'obiettivo`}
+    </div>
+    <div class="card">
+      <div class="cardtitle sans">Aggiungi poppata</div>
+      <div class="formrow">
+        <input id="amountInput" class="sans" placeholder="${settings.unit} bevuti" inputmode="decimal" onkeydown="if(event.key==='Enter') addEntry()"/>
+        <button class="btn-add sans" onclick="addEntry()">+ Aggiungi</button>
+      </div>
+    </div>
+    ${entriesHtml}
+    <div class="card" style="margin-top:24px">
+      <div class="cardtitle sans">Obiettivo</div>
+      <div class="goalinputs">
+        <label class="sans">Obiettivo giornaliero attuale
+          <input type="number" value="${settings.goal}" onchange="updateGoalSetting('goal', this.value)"/>
+        </label>
+        <label class="sans">Incremento a obiettivo raggiunto
+          <input type="number" value="${settings.step}" onchange="updateGoalSetting('step', this.value)"/>
+        </label>
+      </div>
+      <div class="goalnote sans">Le modifiche valgono dal prossimo giorno non ancora iniziato.</div>
+    </div>
+    <div class="cardtitle sans">Storico giornaliero</div>
+    ${histHtml}
   `;
 
-  dayRecord.meals.forEach((meal, i) => {
-    const target = targets[i];
-    const recorded = meal.leftover !== null;
-    const carried = i>0 && (dayRecord.meals[i-1]?.leftover ?? 0) > 0;
-    html += `<div class="meal">
-      <div>
-        <div class="mealno sans">PASTO ${i+1}</div>
-        <div class="mealtarget">${target} ${settings.unit}</div>
-        ${carried ? `<div class="carried sans">include l'avanzo del pasto precedente</div>` : ""}
-        ${recorded ? `<div class="status sans ${meal.leftover===0?'ok':'no'}">${meal.leftover===0 ? "Finito tutto" : `Avanzati ${meal.leftover} ${settings.unit}`}</div>` : ""}
-      </div>
-      ${!recorded ? `
-        <div class="actions">
-          <button class="btn-fin sans" onclick="markFinished(${i})">✓ Finito</button>
-          <input class="leftover-input" placeholder="avanzo" inputmode="decimal" oninput="onLeftoverInput(${i}, this.value)" value="${leftoverDraft[i] ?? ''}"/>
-          <button class="btn-mark sans" onclick="markLeftover(${i})">Segna</button>
-        </div>
-      ` : `<button class="btn-edit sans" onclick="resetMeal(${i})">Modifica</button>`}
-    </div>`;
-  });
-
-  if(allDone){
-    html += `<div class="summary sans" style="color:${dayFullyFinished?'#6E8B74':'#8A7A61'}">
-      ${dayFullyFinished
-        ? `Tutti i 7 pasti finiti senza avanzi — domani si parte da ${settings.baseAmount} ${settings.unit}.`
-        : "Giornata completata. Quantità di domani invariata."}
-    </div>`;
-  }
-
-  document.getElementById("viewPasti").innerHTML = html;
+  if(toastMsg){ setTimeout(()=>{ toastMsg=""; if(tab==='pasti') renderPasti(); }, 4200); }
 }
 
 function renderCrescita(){
@@ -223,14 +238,14 @@ function renderCrescita(){
   let chartHtml;
   if(sorted.length >= 2){
     const w=560, h=200, pad=36;
-    const kgs = sorted.map(w=>w.grams/1000);
+    const kgs = sorted.map(x=>x.grams/1000);
     const min = Math.min(...kgs), max = Math.max(...kgs);
     const range = (max-min) || 1;
     const stepX = (w - pad*2) / (sorted.length-1);
     const pts = sorted.map((wt,i)=>{
       const x = pad + i*stepX;
       const y = h - pad - ((wt.grams/1000 - min)/range) * (h - pad*2);
-      return {x,y,kg:(wt.grams/1000).toFixed(3), label: new Date(wt.date+"T00:00:00").toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit"})};
+      return {x,y,label: shortDate(wt.date)};
     });
     const path = pts.map((p,i)=> (i===0?"M":"L")+p.x.toFixed(1)+","+p.y.toFixed(1)).join(" ");
     let dots = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#6E8B74"/>`).join("");
@@ -274,7 +289,6 @@ function render(){
   document.getElementById("tabCrescita").className = "tab sans" + (tab==="crescita" ? " active" : "");
   document.getElementById("viewPasti").style.display = tab==="pasti" ? "block" : "none";
   document.getElementById("viewCrescita").style.display = tab==="crescita" ? "block" : "none";
-  renderRing();
   if(tab==="pasti") renderPasti(); else renderCrescita();
 }
 
