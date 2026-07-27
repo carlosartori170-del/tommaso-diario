@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tommaso — Diario di crescita</title>
+<style>
+  :root{
+    --paper:#FAF3EA; --ink:#2B3A42; --line:#EFE6D6; --line2:#E7DBC9;
+    --gold:#B08A5A; --amber:#D9A441; --clay:#C1694F; --sage:#6E8B74;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:Georgia,'Iowan Old Style',serif;}
+  .sans{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+  button{cursor:pointer; font-family:inherit;}
+  header{padding:28px 20px 18px; border-bottom:1px solid var(--line2);}
+  .headrow{display:flex; align-items:baseline; justify-content:space-between; max-width:640px; margin:0 auto;}
+  .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold);}
+  h1{margin:2px 0 0; font-size:30px; font-weight:600;}
+  .tabs{display:flex; justify-content:center; gap:6px; padding:16px 20px 0;}
+  .tab{display:flex; align-items:center; gap:6px; padding:9px 18px; border-radius:999px;
+    border:1px solid var(--line2); background:transparent; color:var(--ink); font-size:14px; font-weight:600;}
+  .tab.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  main{max-width:640px; margin:0 auto; padding:24px 20px 60px;}
+  .navrow{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;}
+  .navbtn{background:none; border:none; color:var(--gold); font-size:20px; padding:4px 8px;}
+  .navbtn:disabled{color:var(--line2);}
+  .daylabel{font-size:17px; font-weight:600; text-transform:capitalize; text-align:center;}
+  .daysub{font-size:12px; color:#8A7A61; text-align:center;}
+  .toast{background:#EFE4CC; border:1px solid var(--amber); color:#6B5320; padding:10px 14px;
+    border-radius:10px; font-size:13.5px; margin-bottom:16px;}
+  .meal{background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;}
+  .mealno{font-size:12px; color:var(--gold); font-weight:700;}
+  .mealtarget{font-size:20px; font-weight:600;}
+  .carried{font-size:12px; color:var(--clay);}
+  .status{font-size:12.5px; margin-top:2px;}
+  .status.ok{color:var(--sage);} .status.no{color:var(--clay);}
+  .actions{display:flex; gap:6px;}
+  .btn-fin{background:var(--sage); color:#fff; border:none; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600;}
+  .leftover-input{width:62px; border:1px solid var(--line2); border-radius:10px; padding:8px; font-size:13px;}
+  .btn-mark{background:var(--clay); color:#fff; border:none; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600;}
+  .btn-edit{background:none; border:1px solid var(--line2); border-radius:10px; padding:7px 10px; font-size:12px; color:#8A7A61;}
+  .summary{margin-top:18px; text-align:center; font-size:13.5px;}
+  .card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:20px;}
+  .cardtitle{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:10px;}
+  .formrow{display:flex; gap:8px; flex-wrap:wrap;}
+  .formrow input{border:1px solid var(--line2); border-radius:10px; padding:9px 10px; font-size:13px; flex:1 1 140px;}
+  .btn-add{background:var(--ink); color:#fff; border:none; border-radius:10px; padding:9px 16px; font-size:13px; font-weight:600;}
+  .histitem{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .histdate{font-size:13.5px; color:#8A7A61; text-transform:capitalize;}
+  .btn-rm{background:none; border:none; color:var(--clay); font-size:16px;}
+  .empty{color:#8A7A61; font-size:13px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="headrow">
+    <div>
+      <div class="eyebrow sans">Diario di crescita</div>
+      <h1>Tommaso</h1>
+    </div>
+    <svg id="ring" width="56" height="56"></svg>
+  </div>
+</header>
+
+<div class="tabs sans">
+  <button class="tab active" id="tabPasti" onclick="setTab('pasti')">🍼 Pasti</button>
+  <button class="tab" id="tabCrescita" onclick="setTab('crescita')">⚖️ Crescita</button>
+</div>
+
+<main>
+  <div id="viewPasti"></div>
+  <div id="viewCrescita" style="display:none"></div>
+</main>
+
+<script>
+// ---------- storage (localStorage — dati solo su questo dispositivo/browser) ----------
+const LS = {
+  get(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } },
+  set(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){} }
+};
+
+const DEFAULT_SETTINGS = { baseAmount: 90, unit: "ml", step: 10 };
+let settings = LS.get("settings", DEFAULT_SETTINGS);
+let weights = LS.get("weights", []);
+let dayKey = todayKey();
+let leftoverDraft = {};
+let toastMsg = "";
+let tab = "pasti";
+
+function todayKey(d){ d = d || new Date(); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
+function prettyDate(key){ const d = new Date(key+"T00:00:00"); return d.toLocaleDateString("it-IT",{weekday:"long", day:"numeric", month:"long"}); }
+function shiftDay(key, delta){ const d = new Date(key+"T00:00:00"); d.setDate(d.getDate()+delta); return todayKey(d); }
+function loadDay(key){ return LS.get(`day:${key}`, { date:key, baseAmount: settings.baseAmount, meals: Array.from({length:7}, ()=>({leftover:null})) }); }
+function saveDay(rec){ LS.set(`day:${rec.date}`, rec); }
+
+let dayRecord = loadDay(dayKey);
+
+function computeTargets(rec){
+  const t = []; let carry = 0;
+  for(let i=0;i<7;i++){ t.push(rec.baseAmount + carry); carry = rec.meals[i]?.leftover ?? 0; }
+  return t;
+}
+
+function commitMeal(index, leftoverValue){
+  dayRecord.meals[index] = { leftover: leftoverValue };
+  saveDay(dayRecord);
+  const nowAllDone = dayRecord.meals.every(m => m.leftover !== null);
+  if(nowAllDone){
+    const allFinished = dayRecord.meals.every(m => m.leftover === 0);
+    if(allFinished){
+      settings = { ...settings, baseAmount: settings.baseAmount + settings.step };
+      LS.set("settings", settings);
+      toastMsg = `Giornata completata senza avanzi! Da domani si passa a ${settings.baseAmount} ${settings.unit} a pasto.`;
+    } else {
+      toastMsg = "Giornata registrata. Restiamo alla stessa quantità per domani.";
+    }
+    setTimeout(()=>{ toastMsg=""; render(); }, 3200);
+  }
+  render();
+}
+
+function markFinished(i){ commitMeal(i, 0); }
+function markLeftover(i){
+  const raw = (leftoverDraft[i] ?? "").replace(",", ".");
+  const v = parseFloat(raw);
+  if(isNaN(v) || v < 0) return;
+  commitMeal(i, v);
+}
+function resetMeal(i){ dayRecord.meals[i] = { leftover: null }; saveDay(dayRecord); render(); }
+function onLeftoverInput(i, val){ leftoverDraft[i] = val; }
+function goDay(delta){ dayKey = shiftDay(dayKey, delta); dayRecord = loadDay(dayKey); leftoverDraft = {}; render(); }
+
+function addWeight(){
+  const dateEl = document.getElementById("wDate");
+  const gramsEl = document.getElementById("wGrams");
+  const g = parseFloat((gramsEl.value||"").replace(",", "."));
+  const date = dateEl.value || todayKey();
+  if(isNaN(g) || g <= 0) return;
+  weights = weights.filter(w => w.date !== date);
+  weights.push({ date, grams: Math.round(g) });
+  weights.sort((a,b)=> a.date.localeCompare(b.date));
+  LS.set("weights", weights);
+  gramsEl.value = "";
+  render();
+}
+function removeWeight(date){ weights = weights.filter(w=>w.date!==date); LS.set("weights", weights); render(); }
+
+function setTab(t){ tab = t; render(); }
+
+// ---------- rendering ----------
+function renderRing(){
+  const svg = document.getElementById("ring");
+  const size=56, r=22, cx=28, cy=28;
+  let html = "";
+  for(let i=0;i<7;i++){
+    const angle = (Math.PI*2*i)/7 - Math.PI/2;
+    const x = cx + r*Math.cos(angle), y = cy + r*Math.sin(angle);
+    const m = dayRecord.meals[i];
+    const fill = !m || m.leftover===null ? "#EFE6D6" : m.leftover===0 ? "#6E8B74" : "#C1694F";
+    html += `<circle cx="${x}" cy="${y}" r="5.5" fill="${fill}"/>`;
+  }
+  html += `<circle cx="${cx}" cy="${cy}" r="3" fill="#B08A5A"/>`;
+  svg.innerHTML = html;
+}
+
+function renderPasti(){
+  const targets = computeTargets(dayRecord);
+  const isToday = dayKey === todayKey();
+  const recordedCount = dayRecord.meals.filter(m=>m.leftover!==null).length;
+  const allDone = recordedCount === 7;
+  const dayFullyFinished = allDone && dayRecord.meals.every(m=>m.leftover===0);
+
+  let html = `
+    <div class="navrow">
+      <button class="navbtn" onclick="goDay(-1)">‹</button>
+      <div>
+        <div class="daylabel">${prettyDate(dayKey)}</div>
+        <div class="daysub sans">${isToday ? "Oggi · " : ""}base ${dayRecord.baseAmount} ${settings.unit}</div>
+      </div>
+      <button class="navbtn" onclick="goDay(1)" ${isToday?"disabled":""}>›</button>
+    </div>
+    ${toastMsg ? `<div class="toast sans">${toastMsg}</div>` : ""}
+  `;
+
+  dayRecord.meals.forEach((meal, i) => {
+    const target = targets[i];
+    const recorded = meal.leftover !== null;
+    const carried = i>0 && (dayRecord.meals[i-1]?.leftover ?? 0) > 0;
+    html += `<div class="meal">
+      <div>
+        <div class="mealno sans">PASTO ${i+1}</div>
+        <div class="mealtarget">${target} ${settings.unit}</div>
+        ${carried ? `<div class="carried sans">include l'avanzo del pasto precedente</div>` : ""}
+        ${recorded ? `<div class="status sans ${meal.leftover===0?'ok':'no'}">${meal.leftover===0 ? "Finito tutto" : `Avanzati ${meal.leftover} ${settings.unit}`}</div>` : ""}
+      </div>
+      ${!recorded ? `
+        <div class="actions">
+          <button class="btn-fin sans" onclick="markFinished(${i})">✓ Finito</button>
+          <input class="leftover-input" placeholder="avanzo" inputmode="decimal" oninput="onLeftoverInput(${i}, this.value)" value="${leftoverDraft[i] ?? ''}"/>
+          <button class="btn-mark sans" onclick="markLeftover(${i})">Segna</button>
+        </div>
+      ` : `<button class="btn-edit sans" onclick="resetMeal(${i})">Modifica</button>`}
+    </div>`;
+  });
+
+  if(allDone){
+    html += `<div class="summary sans" style="color:${dayFullyFinished?'#6E8B74':'#8A7A61'}">
+      ${dayFullyFinished
+        ? `Tutti i 7 pasti finiti senza avanzi — domani si parte da ${settings.baseAmount} ${settings.unit}.`
+        : "Giornata completata. Quantità di domani invariata."}
+    </div>`;
+  }
+
+  document.getElementById("viewPasti").innerHTML = html;
+}
+
+function renderCrescita(){
+  const sorted = [...weights].sort((a,b)=>a.date.localeCompare(b.date));
+  let chartHtml;
+  if(sorted.length >= 2){
+    const w=560, h=200, pad=36;
+    const kgs = sorted.map(w=>w.grams/1000);
+    const min = Math.min(...kgs), max = Math.max(...kgs);
+    const range = (max-min) || 1;
+    const stepX = (w - pad*2) / (sorted.length-1);
+    const pts = sorted.map((wt,i)=>{
+      const x = pad + i*stepX;
+      const y = h - pad - ((wt.grams/1000 - min)/range) * (h - pad*2);
+      return {x,y,kg:(wt.grams/1000).toFixed(3), label: new Date(wt.date+"T00:00:00").toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit"})};
+    });
+    const path = pts.map((p,i)=> (i===0?"M":"L")+p.x.toFixed(1)+","+p.y.toFixed(1)).join(" ");
+    let dots = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#6E8B74"/>`).join("");
+    let labels = pts.map(p=>`<text x="${p.x.toFixed(1)}" y="${h-10}" font-size="10" fill="#8A7A61" text-anchor="middle" font-family="sans-serif">${p.label}</text>`).join("");
+    chartHtml = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="220">
+      <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#E7DBC9"/>
+      <path d="${path}" fill="none" stroke="#6E8B74" stroke-width="2.5"/>
+      ${dots}${labels}
+    </svg>`;
+  } else {
+    chartHtml = `<div class="empty sans" style="text-align:center; padding:40px 10px;">Aggiungi almeno due pesate per vedere la curva di crescita.</div>`;
+  }
+
+  let hist = "";
+  [...weights].reverse().forEach(w=>{
+    hist += `<div class="histitem">
+      <span class="histdate sans">${prettyDate(w.date)}</span>
+      <span style="font-weight:600">${(w.grams/1000).toFixed(3)} kg</span>
+      <button class="btn-rm sans" onclick="removeWeight('${w.date}')">−</button>
+    </div>`;
+  });
+  if(weights.length===0) hist = `<div class="empty sans">Nessuna pesata registrata.</div>`;
+
+  document.getElementById("viewCrescita").innerHTML = `
+    <div class="card">${chartHtml}</div>
+    <div class="card">
+      <div class="cardtitle sans">Nuova pesata</div>
+      <div class="formrow">
+        <input type="date" id="wDate" class="sans" value="${todayKey()}"/>
+        <input type="text" id="wGrams" class="sans" placeholder="grammi, es. 3450" inputmode="decimal"/>
+        <button class="btn-add sans" onclick="addWeight()">+ Aggiungi</button>
+      </div>
+    </div>
+    <div class="cardtitle sans">Storico</div>
+    ${hist}
+  `;
+}
+
+function render(){
+  document.getElementById("tabPasti").className = "tab sans" + (tab==="pasti" ? " active" : "");
+  document.getElementById("tabCrescita").className = "tab sans" + (tab==="crescita" ? " active" : "");
+  document.getElementById("viewPasti").style.display = tab==="pasti" ? "block" : "none";
+  document.getElementById("viewCrescita").style.display = tab==="crescita" ? "block" : "none";
+  renderRing();
+  if(tab==="pasti") renderPasti(); else renderCrescita();
+}
+
+render();
+</script>
+</body>
+</html>
