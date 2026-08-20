@@ -14,9 +14,13 @@
   .sans{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
   button{cursor:pointer; font-family:inherit;}
   header{padding:28px 20px 18px; border-bottom:1px solid var(--line2);}
-  .headwrap{max-width:640px; margin:0 auto;}
+  .headwrap{max-width:640px; margin:0 auto; display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
   .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold);}
   h1{margin:2px 0 0; font-size:30px; font-weight:600;}
+  .syncbadge{font-size:11px; padding:4px 10px; border-radius:999px; white-space:nowrap;}
+  .syncbadge.ok{background:#E7EFE5; color:#43604A;}
+  .syncbadge.err{background:#F6E3DC; color:#8A3D28;}
+  .syncbadge.loading{background:#EFE6D6; color:#8A7A61;}
   .tabs{display:flex; justify-content:center; gap:6px; padding:16px 20px 0;}
   .tab{display:flex; align-items:center; gap:6px; padding:9px 18px; border-radius:999px;
     border:1px solid var(--line2); background:transparent; color:var(--ink); font-size:14px; font-weight:600;}
@@ -28,6 +32,7 @@
   .daylabel{font-size:17px; font-weight:600; text-transform:capitalize; text-align:center;}
   .daysub{font-size:12px; color:#8A7A61; text-align:center;}
   .toast{background:#EFE4CC; border:1px solid var(--amber); color:#6B5320; padding:10px 14px; border-radius:10px; font-size:13.5px; margin-bottom:16px;}
+  .toast.err{background:#F6E3DC; border-color:#C1694F; color:#8A3D28;}
   .ringwrap{display:flex; justify-content:center;}
   .remaining{text-align:center; margin:14px 0 22px; font-size:14px;}
   .card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:20px;}
@@ -35,6 +40,7 @@
   .formrow{display:flex; gap:8px; flex-wrap:wrap;}
   .formrow input{border:1px solid var(--line2); border-radius:10px; padding:9px 10px; font-size:13px; flex:1 1 140px;}
   .btn-add{background:var(--ink); color:#fff; border:none; border-radius:10px; padding:9px 16px; font-size:13px; font-weight:600;}
+  .btn-add:disabled{opacity:.5;}
   .entry, .histitem{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px;
     display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
   .entrytime, .histdate{font-size:13px; color:#8A7A61;}
@@ -45,15 +51,24 @@
   .goalinputs label{font-size:12.5px; color:#8A7A61;}
   .goalinputs input{display:block; margin-top:4px; border:1px solid var(--line2); border-radius:10px; padding:8px 10px; font-size:13px; width:100px;}
   .goalnote{font-size:12px; color:#8A7A61; margin-top:8px;}
+  .migrate{background:#EFE4CC; border:1px solid var(--amber); border-radius:12px; padding:14px; margin:0 20px 0; max-width:600px; margin-left:auto; margin-right:auto;}
 </style>
 </head>
 <body>
 <header>
   <div class="headwrap">
-    <div class="eyebrow sans">Diario di crescita</div>
-    <h1>Tommaso</h1>
+    <div>
+      <div class="eyebrow sans">Diario di crescita</div>
+      <h1>Tommaso</h1>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="sans" style="border:1px solid var(--line2); background:none; border-radius:999px; padding:6px 12px; font-size:11px; color:var(--ink);" onclick="downloadBackup()">⤓ Backup</button>
+      <div id="syncBadge" class="syncbadge loading sans">connessione…</div>
+    </div>
   </div>
 </header>
+
+<div id="migrateBanner"></div>
 
 <div class="tabs sans">
   <button class="tab active" id="tabPasti" onclick="setTab('pasti')">🍼 Poppate</button>
@@ -61,111 +76,330 @@
 </div>
 
 <main>
-  <div id="viewPasti"></div>
+  <div id="viewPasti">Caricamento…</div>
   <div id="viewCrescita" style="display:none"></div>
 </main>
 
+<!-- Libreria client di Supabase: permette a questa pagina di parlare
+     direttamente con il database nel cloud, senza bisogno di un server. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-// ---------- storage (localStorage — dati solo su questo dispositivo/browser) ----------
+// ====================================================================
+// CONFIGURAZIONE SUPABASE — obbligatoria prima di usare l'app
+// ====================================================================
+// 1. Crea un progetto gratuito su https://supabase.com
+// 2. Esegui lo script "schema.sql" (fornito insieme a questo file)
+//    nella sezione "SQL Editor" del tuo progetto.
+// 3. Vai su Project Settings -> API e copia qui sotto:
+//    - "Project URL"      -> SUPABASE_URL
+//    - "anon public" key  -> SUPABASE_ANON_KEY
+const SUPABASE_URL = "https://aikppsohuoprmiwfqgok.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_VmlWvtK2NjBAtdOUeTCStw_tKJzU1EC";
+// ====================================================================
+
+const CONFIGURED = !SUPABASE_URL.startsWith("INSERISCI") && !SUPABASE_ANON_KEY.startsWith("INSERISCI");
+const sb = CONFIGURED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+// ---------- cache locale (solo come copia di riserva, non più la fonte dei dati) ----------
 const LS = {
   get(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } },
   set(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){} }
 };
 
 const DEFAULT_SETTINGS = { goal: 630, step: 70, unit: "ml" };
-let settings = LS.get("settings", DEFAULT_SETTINGS);
-let dayIndex = LS.get("dayIndex", []);
-let weights = LS.get("weights", []);
+
+let settings = { ...DEFAULT_SETTINGS };
+let days = [];          // [{date, goal}]
+let entries = [];        // [{id, date, time, amount}]
+let weights = LS.get("weights", []); // sovrascritto dopo il primo caricamento cloud
 let dayKey = todayKey();
 let toastMsg = "";
+let toastIsError = false;
 let tab = "pasti";
+let syncOk = true;
 
 function todayKey(d){ d = d || new Date(); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
 function prettyDate(key){ return new Date(key+"T00:00:00").toLocaleDateString("it-IT",{weekday:"long", day:"numeric", month:"long"}); }
 function shortDate(key){ return new Date(key+"T00:00:00").toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit"}); }
 function shiftDay(key, delta){ const d = new Date(key+"T00:00:00"); d.setDate(d.getDate()+delta); return todayKey(d); }
 function nowTime(){ return new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}); }
-function loadDayRaw(key){ return LS.get(`day:${key}`, null); }
-function saveDay(rec){ LS.set(`day:${rec.date}`, rec); }
-function total(rec){ return (rec && rec.entries ? rec.entries : []).reduce((s,e)=>s+e.amount,0); }
 
-function ensureDay(key){
-  let rec = loadDayRaw(key);
-  // scarta record salvati con un formato incompatibile (es. versione precedente dell'app)
-  if(rec && (!Array.isArray(rec.entries) || typeof rec.goal !== "number")){
-    rec = null;
+// Le chiamate a Supabase, quando qualcosa va storto (permessi, dati non
+// validi, tabella mancante...), NON generano un'eccezione: restituiscono
+// semplicemente { error: {...} }. Se non controlliamo quel campo a mano,
+// il codice pensa che tutto sia andato bene anche quando non è stato
+// salvato nulla — che è esattamente il tipo di bug che fa perdere dati
+// senza che nessuno se ne accorga. Questo helper lo rende impossibile:
+// se c'è un errore, lo trasforma in un'eccezione vera con un messaggio
+// leggibile.
+async function sbCheck(promise){
+  const { data, error } = await promise;
+  if(error){
+    const msg = error.message || error.hint || error.details || JSON.stringify(error);
+    throw new Error(msg);
   }
-  if(!rec){
-    const prevKey = shiftDay(key, -1);
-    const prevRec = loadDayRaw(prevKey);
-    if(prevRec){
-      const prevTotal = total(prevRec);
-      if(prevTotal >= prevRec.goal){
-        settings = { ...settings, goal: settings.goal + settings.step };
-        LS.set("settings", settings);
-        toastMsg = `Obiettivo di ieri raggiunto (${prevTotal} ${settings.unit})! Da oggi l'obiettivo sale a ${settings.goal} ${settings.unit}.`;
-      }
-    }
-    rec = { date: key, goal: settings.goal, entries: [] };
-    saveDay(rec);
-  }
-  if(!dayIndex.includes(key)){ dayIndex = [...dayIndex, key].sort(); LS.set("dayIndex", dayIndex); }
-  return rec;
+  return data;
 }
 
-let dayRecord = ensureDay(dayKey);
+function entriesFor(date){ return entries.filter(e=>e.date===date); }
+function dayOf(date){ return days.find(d=>d.date===date); }
+function totalFor(date){ return entriesFor(date).reduce((s,e)=>s+Number(e.amount),0); }
+
+function mirrorLocalBackup(){
+  // Copia locale di sola riserva: se il cloud non risponde, l'app può
+  // ancora mostrare l'ultimo stato conosciuto invece di restare vuota.
+  LS.set("backup_settings", settings);
+  LS.set("backup_days", days);
+  LS.set("backup_entries", entries);
+  LS.set("backup_weights", weights);
+  LS.set("backup_at", new Date().toISOString());
+}
+
+function setSyncBadge(state){
+  const el = document.getElementById("syncBadge");
+  if(!el) return;
+  el.className = "syncbadge sans " + state;
+  el.textContent = state === "ok" ? "sincronizzato" : state === "err" ? "offline / errore" : "connessione…";
+}
+
+// ---------- caricamento iniziale dal database ----------
+async function loadAll(){
+  if(!CONFIGURED){
+    document.getElementById("viewPasti").innerHTML = `<div class="empty sans" style="text-align:center; padding:30px 10px;">
+      Questa copia dell'app non è ancora collegata al database.<br/><br/>
+      Apri il file <b>index.html</b> con un editor di testo, e nella sezione
+      "CONFIGURAZIONE SUPABASE" inserisci l'URL e la chiave del tuo progetto Supabase
+      (le trovi in Project Settings → API dopo aver creato un progetto gratuito su supabase.com).
+    </div>`;
+    setSyncBadge("err");
+    return;
+  }
+  try{
+    const [{data:settingsRow}, {data:daysRows}, {data:entriesRows}, {data:weightsRows}] = await Promise.all([
+      sb.from('settings').select('*').eq('id',1).maybeSingle(),
+      sb.from('days').select('*').order('date'),
+      sb.from('entries').select('*').order('date').order('time'),
+      sb.from('weights').select('*').order('date'),
+    ]);
+
+    if(!settingsRow){
+      await sb.from('settings').insert({ id:1, ...DEFAULT_SETTINGS });
+      settings = { ...DEFAULT_SETTINGS };
+    } else {
+      settings = { goal: Number(settingsRow.goal), step: Number(settingsRow.step), unit: settingsRow.unit };
+    }
+    days = daysRows || [];
+    entries = entriesRows || [];
+    weights = weightsRows || [];
+
+    syncOk = true;
+    setSyncBadge("ok");
+    mirrorLocalBackup();
+    maybeOfferMigration();
+    await ensureDay(dayKey);
+    render();
+  }catch(err){
+    console.error(err);
+    syncOk = false;
+    setSyncBadge("err");
+    // Ripiego sull'ultima copia locale conosciuta, così l'app resta usabile offline.
+    settings = LS.get("backup_settings", DEFAULT_SETTINGS);
+    days = LS.get("backup_days", []);
+    entries = LS.get("backup_entries", []);
+    weights = LS.get("backup_weights", []);
+    toastMsg = "Non riesco a collegarmi al database in questo momento: mostro l'ultima copia salvata. Le modifiche fatte ora potrebbero non essere sincronizzate.";
+    toastIsError = true;
+    render();
+  }
+}
+
+// Se su questo telefono esistono ancora dati della vecchia versione
+// (solo-locale) e il database cloud risulta vuoto, offriamo di importarli
+// prima di proseguire, così non si perde quello che c'è ancora qui.
+function maybeOfferMigration(){
+  const legacyDayIndex = LS.get("dayIndex", []);
+  const legacyWeights = LS.get("weights", []);
+  const cloudEmpty = days.length === 0 && weights.length === 0;
+  const hasLegacy = legacyDayIndex.length > 0 || legacyWeights.length > 0;
+  if(!cloudEmpty || !hasLegacy) return;
+
+  document.getElementById("migrateBanner").innerHTML = `
+    <div class="migrate sans" style="margin-bottom:18px;">
+      Ho trovato dei dati salvati solo su questo telefono (dalla vecchia versione dell'app),
+      mentre il database cloud è ancora vuoto. Vuoi importarli ora, così non si perdono?
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button class="btn-add sans" onclick="migrateLegacyData()">Importa i dati nel cloud</button>
+        <button class="btn-rm sans" style="border:1px solid var(--line2); border-radius:10px; padding:9px 16px;" onclick="document.getElementById('migrateBanner').innerHTML=''">Ignora</button>
+      </div>
+    </div>`;
+}
+
+async function migrateLegacyData(){
+  const legacyDayIndex = LS.get("dayIndex", []);
+  const legacySettings = LS.get("settings", DEFAULT_SETTINGS);
+  document.getElementById("migrateBanner").innerHTML = `<div class="migrate sans">Importazione in corso…</div>`;
+  try{
+    await sbCheck(sb.from('settings').update({ goal: legacySettings.goal, step: legacySettings.step, unit: legacySettings.unit }).eq('id',1));
+    settings = { ...legacySettings };
+    for(const key of legacyDayIndex){
+      const rec = LS.get(`day:${key}`, null);
+      if(!rec || !Array.isArray(rec.entries)) continue;
+      await sbCheck(sb.from('days').upsert({ date: rec.date, goal: rec.goal }));
+      for(const e of rec.entries){
+        await sbCheck(sb.from('entries').insert({ date: rec.date, time: e.time, amount: e.amount }));
+      }
+    }
+    const legacyWeights = LS.get("weights", []);
+    for(const w of legacyWeights){
+      await sbCheck(sb.from('weights').upsert({ date: w.date, grams: w.grams }));
+    }
+    document.getElementById("migrateBanner").innerHTML = `<div class="migrate sans">Importazione completata! Ricarico l'app…</div>`;
+    setTimeout(()=>location.reload(), 1200);
+  }catch(err){
+    console.error(err);
+    document.getElementById("migrateBanner").innerHTML = `<div class="migrate sans">
+      Importazione non riuscita: <b>${err.message}</b><br/>
+      <span style="font-size:12px;">Copia questo messaggio e mandalo per capire cosa non va.</span>
+      <div style="margin-top:10px;"><button class="btn-add sans" onclick="migrateLegacyData()">Riprova</button></div>
+    </div>`;
+  }
+}
+
+async function ensureDay(key){
+  let d = dayOf(key);
+  if(!d){
+    const prevKey = shiftDay(key, -1);
+    const prevDay = dayOf(prevKey);
+    if(prevDay){
+      const prevTotal = totalFor(prevKey);
+      if(prevTotal >= prevDay.goal){
+        settings = { ...settings, goal: settings.goal + settings.step };
+        try{ await sbCheck(sb.from('settings').update({ goal: settings.goal }).eq('id',1)); }catch(e){ console.error(e); }
+        toastMsg = `Obiettivo di ieri raggiunto (${prevTotal} ${settings.unit})! Da oggi l'obiettivo sale a ${settings.goal} ${settings.unit}.`;
+        toastIsError = false;
+      }
+    }
+    d = { date: key, goal: settings.goal };
+    try{
+      await sbCheck(sb.from('days').insert(d));
+      days = [...days, d].sort((a,b)=>a.date.localeCompare(b.date));
+    }catch(err){
+      console.error(err);
+      toastMsg = `Non sono riuscito a creare il nuovo giorno sul database: ${err.message}`;
+      toastIsError = true;
+      setSyncBadge("err");
+    }
+  }
+  mirrorLocalBackup();
+}
 
 function historyList(){
-  return dayIndex.filter(k => k !== dayKey)
-    .map(k => loadDayRaw(k)).filter(Boolean)
-    .map(r => ({ date: r.date, total: total(r), goal: r.goal }))
+  return days.filter(d => d.date !== dayKey)
+    .map(d => ({ date: d.date, total: totalFor(d.date), goal: d.goal }))
     .sort((a,b)=> b.date.localeCompare(a.date));
 }
 
-function addEntry(){
+async function addEntry(){
   const input = document.getElementById("amountInput");
   const v = parseFloat((input.value||"").replace(",", "."));
   if(isNaN(v) || v <= 0) return;
-  dayRecord.entries.push({ id: Date.now().toString(36), time: nowTime(), amount: Math.round(v) });
-  saveDay(dayRecord);
+  const newEntry = { date: dayKey, time: nowTime(), amount: Math.round(v) };
+  try{
+    const { data, error } = await sb.from('entries').insert(newEntry).select().single();
+    if(error) throw error;
+    entries.push(data);
+    setSyncBadge("ok");
+  }catch(err){
+    console.error(err);
+    toastMsg = "Non sono riuscito a salvare questa poppata sul database: controlla la connessione e riprova.";
+    toastIsError = true;
+    setSyncBadge("err");
+  }
+  mirrorLocalBackup();
   input.value = "";
   render();
 }
-function removeEntry(id){ dayRecord.entries = dayRecord.entries.filter(e=>e.id!==id); saveDay(dayRecord); render(); }
-function goDay(delta){ dayKey = shiftDay(dayKey, delta); dayRecord = ensureDay(dayKey); render(); }
 
-function updateGoalSetting(field, value){
+async function removeEntry(id){
+  entries = entries.filter(e=>e.id!==id);
+  render();
+  try{ await sbCheck(sb.from('entries').delete().eq('id', id)); }
+  catch(err){ console.error(err); toastMsg = `Non sono riuscito a rimuovere la poppata dal database: ${err.message}`; toastIsError = true; render(); }
+  mirrorLocalBackup();
+}
+
+async function goDay(delta){
+  dayKey = shiftDay(dayKey, delta);
+  await ensureDay(dayKey);
+  render();
+}
+
+async function updateGoalSetting(field, value){
   const v = parseInt(value, 10);
   if(isNaN(v) || v < 0) return;
   settings = { ...settings, [field]: v };
-  LS.set("settings", settings);
+  try{ await sbCheck(sb.from('settings').update({ [field]: v }).eq('id',1)); }
+  catch(err){ console.error(err); toastMsg = `Non sono riuscito a salvare l'obiettivo: ${err.message}`; toastIsError = true; render(); }
+  mirrorLocalBackup();
 }
 
-function addWeight(){
+async function addWeight(){
   const dateEl = document.getElementById("wDate");
   const gramsEl = document.getElementById("wGrams");
   const g = parseFloat((gramsEl.value||"").replace(",", "."));
   const date = dateEl.value || todayKey();
   if(isNaN(g) || g <= 0) return;
+  const rec = { date, grams: Math.round(g) };
   weights = weights.filter(w => w.date !== date);
-  weights.push({ date, grams: Math.round(g) });
+  weights.push(rec);
   weights.sort((a,b)=> a.date.localeCompare(b.date));
-  LS.set("weights", weights);
+  try{ await sbCheck(sb.from('weights').upsert(rec)); }
+  catch(err){ console.error(err); toastMsg = `Non sono riuscito a salvare la pesata: ${err.message}`; toastIsError = true; }
+  mirrorLocalBackup();
   gramsEl.value = "";
   render();
 }
-function removeWeight(date){ weights = weights.filter(w=>w.date!==date); LS.set("weights", weights); render(); }
+
+async function removeWeight(date){
+  weights = weights.filter(w=>w.date!==date);
+  render();
+  try{ await sbCheck(sb.from('weights').delete().eq('date', date)); }
+  catch(err){ console.error(err); toastMsg = `Non sono riuscito a rimuovere la pesata: ${err.message}`; toastIsError = true; render(); }
+  mirrorLocalBackup();
+}
 
 function setTab(t){ tab = t; render(); }
 
-// ---------- rendering ----------
+// Backup manuale scaricabile in qualsiasi momento, in aggiunta al
+// database cloud: una seconda rete di sicurezza sotto forma di file,
+// nello stesso spirito dei backup che già usi per l'altra tua app.
+function downloadBackup(){
+  const payload = {
+    data_backup: new Date().toISOString(),
+    app: "Tommaso — Diario di crescita",
+    settings, days, entries, weights
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `backup_tommaso_${todayKey()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- rendering (identico all'originale) ----------
 function renderPasti(){
   const isToday = dayKey === todayKey();
-  const currentTotal = total(dayRecord);
+  const dayRecord = dayOf(dayKey) || { date: dayKey, goal: settings.goal };
+  const currentTotal = totalFor(dayKey);
   const remaining = Math.max(dayRecord.goal - currentTotal, 0);
   const reached = currentTotal >= dayRecord.goal;
   const pct = Math.min(currentTotal / dayRecord.goal, 1);
   const hist = historyList();
+  const dayEntries = entriesFor(dayKey);
 
   const size=168, stroke=12, r=(size-stroke)/2, c=2*Math.PI*r, offset = c*(1-pct);
   const ringSvg = `<svg width="${size}" height="${size}">
@@ -177,14 +411,14 @@ function renderPasti(){
   </svg>`;
 
   let entriesHtml = "";
-  [...dayRecord.entries].reverse().forEach(e=>{
+  [...dayEntries].reverse().forEach(e=>{
     entriesHtml += `<div class="entry">
       <span class="entrytime sans">${e.time}</span>
       <span style="font-weight:600">${e.amount} ${settings.unit}</span>
       <button class="btn-rm sans" onclick="removeEntry('${e.id}')">✕</button>
     </div>`;
   });
-  if(dayRecord.entries.length===0) entriesHtml = `<div class="empty sans" style="text-align:center">Nessuna poppata registrata per questo giorno.</div>`;
+  if(dayEntries.length===0) entriesHtml = `<div class="empty sans" style="text-align:center">Nessuna poppata registrata per questo giorno.</div>`;
 
   let histHtml = "";
   hist.forEach(h=>{
@@ -205,7 +439,7 @@ function renderPasti(){
       </div>
       <button class="navbtn" onclick="goDay(1)" ${isToday?"disabled":""}>›</button>
     </div>
-    ${toastMsg ? `<div class="toast sans">${toastMsg}</div>` : ""}
+    ${toastMsg ? `<div class="toast sans${toastIsError?' err':''}">${toastMsg}</div>` : ""}
     <div class="ringwrap">${ringSvg}</div>
     <div class="remaining sans" style="color:${reached?'#6E8B74':'#8A7A61'}">
       ${reached ? "Obiettivo raggiunto per oggi 🎉" : `Mancano ${remaining} ${settings.unit} all'obiettivo`}
@@ -234,7 +468,7 @@ function renderPasti(){
     ${histHtml}
   `;
 
-  if(toastMsg){ setTimeout(()=>{ toastMsg=""; if(tab==='pasti') renderPasti(); }, 4200); }
+  if(toastMsg){ setTimeout(()=>{ toastMsg=""; toastIsError=false; if(tab==='pasti') renderPasti(); }, 4200); }
 }
 
 function renderCrescita(){
@@ -296,15 +530,16 @@ function render(){
   try{
     if(tab==="pasti") renderPasti(); else renderCrescita();
   }catch(err){
+    console.error(err);
     const target = document.getElementById(tab==="pasti" ? "viewPasti" : "viewCrescita");
     target.innerHTML = `<div class="empty sans" style="text-align:center; padding:30px 10px;">
-      Qualcosa non ha funzionato nel caricare i dati salvati su questo dispositivo.<br/><br/>
-      <button class="btn-add sans" onclick="localStorage.clear(); location.reload();">Ripristina l'app su questo telefono</button>
+      Qualcosa non ha funzionato nel mostrare i dati.<br/><br/>
+      <button class="btn-add sans" onclick="location.reload();">Ricarica l'app</button>
     </div>`;
   }
 }
 
-render();
+loadAll();
 </script>
 </body>
 </html>
