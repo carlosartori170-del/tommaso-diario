@@ -6,14 +6,14 @@
 <title>Tommaso — Diario di crescita</title>
 <style>
   :root{
-    --paper:#FAF3EA; --ink:#2B3A42; --line:#EFE6D6; --line2:#E7DBC9;
-    --gold:#B08A5A; --amber:#D9A441; --clay:#C1694F; --sage:#6E8B74;
+    --paper:#EAF7FF; --ink:#17354A; --line:#D6EBF8; --line2:#C6E2F3;
+    --gold:#398DC2; --amber:#55AEE6; --clay:#D56F62; --sage:#4D9D7C;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:var(--paper); color:var(--ink); font-family:Georgia,'Iowan Old Style',serif;}
+  body{margin:0; min-height:100vh; background:linear-gradient(160deg,#F4FBFF 0%,var(--paper) 48%,#D9F0FF 100%); color:var(--ink); font-family:Georgia,'Iowan Old Style',serif;}
   .sans{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
   button{cursor:pointer; font-family:inherit;}
-  header{padding:28px 20px 18px; border-bottom:1px solid var(--line2);}
+  header{padding:28px 20px 18px; border-bottom:1px solid rgba(57,141,194,.16); background:rgba(255,255,255,.46); backdrop-filter:blur(12px);}
   .headwrap{max-width:640px; margin:0 auto; display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
   .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold);}
   h1{margin:2px 0 0; font-size:30px; font-weight:600;}
@@ -24,7 +24,7 @@
   .tabs{display:flex; justify-content:center; gap:6px; padding:16px 20px 0;}
   .tab{display:flex; align-items:center; gap:6px; padding:9px 18px; border-radius:999px;
     border:1px solid var(--line2); background:transparent; color:var(--ink); font-size:14px; font-weight:600;}
-  .tab.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .tab.active{background:var(--amber); color:#fff; border-color:var(--amber); box-shadow:0 5px 14px rgba(85,174,230,.25);}
   main{max-width:640px; margin:0 auto; padding:24px 20px 60px;}
   .navrow{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;}
   .navbtn{background:none; border:none; color:var(--gold); font-size:20px; padding:4px 8px;}
@@ -33,16 +33,29 @@
   .daysub{font-size:12px; color:#8A7A61; text-align:center;}
   .toast{background:#EFE4CC; border:1px solid var(--amber); color:#6B5320; padding:10px 14px; border-radius:10px; font-size:13.5px; margin-bottom:16px;}
   .toast.err{background:#F6E3DC; border-color:#C1694F; color:#8A3D28;}
-  .ringwrap{display:flex; justify-content:center;}
-  .remaining{text-align:center; margin:14px 0 22px; font-size:14px;}
-  .card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:20px;}
+  .milkprogress{background:rgba(255,255,255,.84); border:1px solid rgba(255,255,255,.95); border-radius:22px; padding:20px; margin-bottom:14px; box-shadow:0 10px 30px rgba(50,126,173,.10);}
+  .milktotal{display:flex; align-items:center; justify-content:center; gap:14px;}
+  .milkicon{font-size:36px; line-height:1; flex:0 0 auto;}
+  .milknumber{font-size:34px; font-weight:600; line-height:1.05;}
+  .milksub{font-size:12px; color:#68879B; margin-top:4px;}
+  .milkbar{height:10px; background:#D6EBF8; border-radius:999px; overflow:hidden; margin:18px 0 8px;}
+  .milkbarfill{height:100%; background:linear-gradient(90deg,#55AEE6,#7CC8F4); border-radius:999px; transition:width .3s ease;}
+  .remaining{text-align:center; margin:0; font-size:14px;}
+  .card{background:rgba(255,255,255,.84); border:1px solid rgba(255,255,255,.95); border-radius:18px; padding:16px; margin-bottom:20px; box-shadow:0 8px 24px rgba(50,126,173,.08);}
   .cardtitle{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:10px;}
   .formrow{display:flex; gap:8px; flex-wrap:wrap;}
   .formrow input{border:1px solid var(--line2); border-radius:10px; padding:9px 10px; font-size:13px; flex:1 1 140px;}
-  .btn-add{background:var(--ink); color:#fff; border:none; border-radius:10px; padding:9px 16px; font-size:13px; font-weight:600;}
+  .btn-add{background:var(--amber); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-size:13px; font-weight:600; box-shadow:0 5px 14px rgba(85,174,230,.22);}
   .btn-add:disabled{opacity:.5;}
-  .entry, .histitem{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+  .entry, .histitem{background:rgba(255,255,255,.88); border:1px solid rgba(255,255,255,.95); border-radius:14px; padding:11px 14px;
     display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .histitem{width:100%; color:inherit; font-family:inherit; text-align:left;}
+  .histmain{display:flex; align-items:center; justify-content:space-between; width:100%; gap:10px;}
+  .histchev{color:var(--gold); font-size:20px; line-height:1; transition:transform .2s ease;}
+  .histitem.open .histchev{transform:rotate(90deg);}
+  .histdetails{background:rgba(255,255,255,.58); border-radius:0 0 14px 14px; padding:3px 14px 10px; margin:-10px 0 9px;}
+  .histfeed{display:flex; justify-content:space-between; padding:8px 2px; border-bottom:1px dashed var(--line2); font-size:13px;}
+  .histfeed:last-child{border-bottom:none;}
   .entrytime, .histdate{font-size:13px; color:#8A7A61;}
   .histdate{text-transform:capitalize;}
   .btn-rm{background:none; border:none; color:var(--clay); font-size:16px;}
@@ -117,6 +130,7 @@ let toastMsg = "";
 let toastIsError = false;
 let tab = "pasti";
 let syncOk = true;
+let expandedHistoryDate = null;
 
 function todayKey(d){ d = d || new Date(); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
 function prettyDate(key){ return new Date(key+"T00:00:00").toLocaleDateString("it-IT",{weekday:"long", day:"numeric", month:"long"}); }
@@ -299,6 +313,11 @@ function historyList(){
     .sort((a,b)=> b.date.localeCompare(a.date));
 }
 
+function toggleHistoryDay(date){
+  expandedHistoryDate = expandedHistoryDate === date ? null : date;
+  renderPasti();
+}
+
 async function addEntry(){
   const input = document.getElementById("amountInput");
   const v = parseFloat((input.value||"").replace(",", "."));
@@ -401,15 +420,6 @@ function renderPasti(){
   const hist = historyList();
   const dayEntries = entriesFor(dayKey);
 
-  const size=168, stroke=12, r=(size-stroke)/2, c=2*Math.PI*r, offset = c*(1-pct);
-  const ringSvg = `<svg width="${size}" height="${size}">
-    <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="#EFE6D6" stroke-width="${stroke}" fill="none"/>
-    <circle cx="${size/2}" cy="${size/2}" r="${r}" stroke="${reached?'#6E8B74':'#D9A441'}" stroke-width="${stroke}" fill="none"
-      stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 ${size/2} ${size/2})"/>
-    <text x="50%" y="47%" text-anchor="middle" font-size="26" font-weight="600" fill="#2B3A42" font-family="Georgia, serif">${currentTotal}</text>
-    <text x="50%" y="63%" text-anchor="middle" font-size="12" fill="#8A7A61" font-family="-apple-system,sans-serif">di ${dayRecord.goal} ${settings.unit}</text>
-  </svg>`;
-
   let entriesHtml = "";
   [...dayEntries].reverse().forEach(e=>{
     entriesHtml += `<div class="entry">
@@ -422,11 +432,18 @@ function renderPasti(){
 
   let histHtml = "";
   hist.forEach(h=>{
-    histHtml += `<div class="histitem">
-      <span class="histdate sans">${prettyDate(h.date)}</span>
-      <span style="font-weight:600">${h.total} ${settings.unit}</span>
-      ${h.total >= h.goal ? `<span style="color:#6E8B74">✓</span>` : `<span class="sans" style="font-size:11px;color:#C1694F">su ${h.goal}</span>`}
-    </div>`;
+    const isOpen = expandedHistoryDate === h.date;
+    const feeds = entriesFor(h.date).slice().sort((a,b)=>a.time.localeCompare(b.time));
+    histHtml += `<button class="histitem${isOpen?' open':''}" onclick="toggleHistoryDay('${h.date}')" aria-expanded="${isOpen}">
+      <span class="histmain">
+        <span class="histdate sans">${prettyDate(h.date)}</span>
+        <span style="font-weight:600">${h.total} ${settings.unit}</span>
+        <span class="histchev">›</span>
+      </span>
+    </button>`;
+    if(isOpen){
+      histHtml += `<div class="histdetails sans">${feeds.length ? feeds.map(e=>`<div class="histfeed"><span>🕐 ${e.time}</span><strong>${e.amount} ${settings.unit}</strong></div>`).join('') : `<div class="empty" style="padding:10px 2px">Nessuna poppata registrata.</div>`}</div>`;
+    }
   });
   if(hist.length===0) histHtml = `<div class="empty sans">Nessun giorno precedente registrato.</div>`;
 
@@ -440,9 +457,15 @@ function renderPasti(){
       <button class="navbtn" onclick="goDay(1)" ${isToday?"disabled":""}>›</button>
     </div>
     ${toastMsg ? `<div class="toast sans${toastIsError?' err':''}">${toastMsg}</div>` : ""}
-    <div class="ringwrap">${ringSvg}</div>
-    <div class="remaining sans" style="color:${reached?'#6E8B74':'#8A7A61'}">
-      ${reached ? "Obiettivo raggiunto per oggi 🎉" : `Mancano ${remaining} ${settings.unit} all'obiettivo`}
+    <div class="milkprogress">
+      <div class="milktotal">
+        <span class="milkicon" aria-hidden="true">🍼</span>
+        <div><div class="milknumber">${currentTotal} ${settings.unit}</div><div class="milksub sans">su ${dayRecord.goal} ${settings.unit} giornalieri</div></div>
+      </div>
+      <div class="milkbar"><div class="milkbarfill" style="width:${Math.round(pct*100)}%; background:${reached?'#4D9D7C':''}"></div></div>
+      <div class="remaining sans" style="color:${reached?'#4D9D7C':'#68879B'}">
+        ${reached ? "Obiettivo raggiunto per oggi 🎉" : `Mancano ${remaining} ${settings.unit}`}
+      </div>
     </div>
     <div class="card">
       <div class="cardtitle sans">Aggiungi poppata</div>
